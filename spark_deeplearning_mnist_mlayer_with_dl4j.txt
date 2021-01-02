@@ -1,0 +1,102 @@
+import org.nd4j.linalg.dataset.api.iterator.DataSetIterator
+import org.deeplearning4j.datasets.iterator.impl.MnistDataSetIterator
+import org.deeplearning4j.nn.conf.MultiLayerConfiguration
+import org.deeplearning4j.nn.conf.NeuralNetConfiguration
+import org.deeplearning4j.nn.conf.layers.DenseLayer
+import org.deeplearning4j.nn.conf.layers.OutputLayer
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork
+import org.deeplearning4j.nn.weights.WeightInit
+import org.deeplearning4j.nn.api.{Layer, OptimizationAlgorithm}
+import org.deeplearning4j.optimize.listeners.ScoreIterationListener
+import org.nd4j.linalg.api.ndarray.INDArray
+import org.nd4j.linalg.dataset.DataSet
+import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction
+
+//number of rows and columns in the input pictures
+val numRows = 28
+val numColumns = 28
+val outputNum = 10 // number of output classes
+val batchSize = 128 // batch size for each epoch
+val seed = 123 // random number seed for reproducibility
+val numEpochs = 15 // number of epochs to perform
+
+val conf: MultiLayerConfiguration = new NeuralNetConfiguration.Builder().
+    //include a random seed for reproducibility
+    seed(seed).
+    weightInit(WeightInit.XAVIER).
+    //specify the learning rate and the rate of change of the learning rate.
+    updater(org.deeplearning4j.nn.conf.Updater.NESTEROVS).
+    activation("relu").
+    optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT).
+    l2(1e-4).
+    list(2).
+    //create the first, input layer with xavier initialization
+    layer(0, new DenseLayer.Builder().
+            nIn(numRows * numColumns).
+            nOut(1000).
+            weightInit(WeightInit.XAVIER).
+            activation("relu").
+            build()).
+    //create hidden layer
+    layer(1, new OutputLayer.Builder(LossFunction.NEGATIVELOGLIKELIHOOD).
+            nIn(1000).
+            nOut(outputNum).
+            weightInit(WeightInit.XAVIER).
+            activation("softmax").
+            build()).
+    backprop(true).pretrain(false).
+    build()
+
+val model = new MultiLayerNetwork(conf)
+model.init()
+//print the score with every 10 iteration
+//model.setListeners(new ScoreIterationListener(10))
+
+// pass a training listener that reports score every 10 iterations
+val eachIterations = 10
+model.addListeners(new ScoreIterationListener(eachIterations))
+
+//Get the DataSetIterators:
+val mnistTrain = new MnistDataSetIterator(batchSize, true, seed)
+val mnistTest = new MnistDataSetIterator(batchSize, false, seed)
+
+val train = mnistTrain.next
+val test = mnistTest.next
+
+// the simplest way to do multiple epochs is to pass them to `fit`
+// model.fit(mnistTrain, numEpochs)
+
+// try below if you want to check the current number of epoch
+for (i <- 1 to numEpochs) {
+    println("Epoch " + i + " / " + numEpochs)
+    model.fit(train.getFeatureMatrix)
+	
+  // Evaluate the model
+  val eval = new Evaluation()
+  val output = net.output(test.getFeatureMatrix)
+  eval.eval(test.getLabels, output)
+  println("Statistics..."+eval.stats())
+  
+  // in more complex scenarios, a confusion matrix is quite helpful
+  println(eval.getConfusionMatrix())
+}
+
+// val evaluation = model.evaluate[Evaluation](mnistTest)
+import org.deeplearning4j.eval.Evaluation
+val evaluation = new Evaluation(outputNum)
+
+import org.deeplearning4j.nn.api.Layer
+val output = model.output(test.getFeatureMatrix,Layer.TrainingMode.TEST)
+(0 until output.rows()).foreach { i =>
+  val actual = train.getLabels.getRow(i).toString.trim()
+  val predicted = output.getRow(i).toString.trim()
+  println("actual " + actual + " vs predicted " + predicted)
+}
+
+// print the basic statistics about the trained classifier
+println("Accuracy: "+evaluation.accuracy())
+println("Precision: "+evaluation.precision())
+println("Recall: "+evaluation.recall())
+
+// in more complex scenarios, a confusion matrix is quite helpful
+println(evaluation.confusionToString())

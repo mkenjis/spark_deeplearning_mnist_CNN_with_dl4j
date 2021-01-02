@@ -1,9 +1,7 @@
-
 import org.nd4j.linalg.dataset.api.iterator.DataSetIterator
 import org.deeplearning4j.datasets.iterator.impl.MnistDataSetIterator
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration
-import org.deeplearning4j.nn.conf.Updater.ADAGRAD
 import org.deeplearning4j.nn.conf.layers.ConvolutionLayer
 import org.deeplearning4j.nn.conf.layers.SubsamplingLayer
 import org.deeplearning4j.nn.conf.layers.DenseLayer
@@ -11,11 +9,16 @@ import org.deeplearning4j.nn.conf.layers.OutputLayer
 import org.deeplearning4j.nn.conf.layers.setup.ConvolutionLayerSetup
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork
 import org.deeplearning4j.nn.weights.WeightInit
+import org.deeplearning4j.nn.api.{Layer, OptimizationAlgorithm}
 import org.nd4j.linalg.dataset.DataSet
 import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction
-import org.deeplearning4j.nn.api.{Layer, OptimizationAlgorithm}
+import org.deeplearning4j.eval.Evaluation
 
+//number of rows and columns in the input pictures
+val numRows = 28
+val numColumns = 28
 val nChannels = 1
+
 val outputNum = 10
 val batchSize = 64
 val iterations = 1
@@ -29,6 +32,7 @@ val mnistTrain = new MnistDataSetIterator(batchSize, true, seed)
 val mnistTest = new MnistDataSetIterator(batchSize, false, seed)
 
 println("Building model ....")
+
 val builder = new NeuralNetConfiguration.Builder().
   seed(seed).
   iterations(iterations).
@@ -67,7 +71,7 @@ val builder = new NeuralNetConfiguration.Builder().
     build()).
   backprop(true).pretrain(false)
 
-new ConvolutionLayerSetup(builder,28,28,1)
+new ConvolutionLayerSetup(builder, numRows, numColumns, nChannels)
 
 val multiLayerConf:MultiLayerConfiguration = builder.build()
 
@@ -76,7 +80,6 @@ net.init()
 
 val test =  mnistTest.next
 
-import org.deeplearning4j.eval.Evaluation
 val nEpochs = 5
 (0 until nEpochs).foreach{i => 
   // Train the model
@@ -87,6 +90,9 @@ val nEpochs = 5
   val output = net.output(test.getFeatureMatrix)
   eval.eval(test.getLabels, output)
   println("Statistics..."+eval.stats())
+  
+  // in more complex scenarios, a confusion matrix is quite helpful
+  println(eval.confusionToString())
 }
 2021-01-01 20:23:44 WARN  BaseOptimizer:278 - Objective function automatically set to             minimize. Set stepFunction in neural net configuration to change default settings.
 2021-01-01 20:28:38 WARN  Evaluation:89 - Creating confusion matrix based on classes p            assed in . Will assume the label distribution passed in is indicative of the overall d            ataset
